@@ -8,10 +8,26 @@
  * but no email will actually be sent).
  * NOTE: If using the PHP mail() function directly, this
  * plugin will NOT stop the emails.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Author: Sal Ferrarello
  * Author URI: http://salferrarello.com/
+ * Text Domain: stop-emails
+ * Domain Path: /languages
  */
+
+// If this file is called directly, abort.
+if ( ! defined( 'WPINC' ) ) {
+    die;
+}
+
+// stop emails
+add_action('phpmailer_init', 'fe_stop_emails');
+
+// display a warning that emails are being stopped
+add_action('admin_notices', 'fe_stop_emails_warning');
+
+// Load plugin text domain
+add_action('init', 'fe_stop_emails_load_plugin_textdomain');
 
 function fe_stop_emails( $phpmailer ) {
     // as a developer, you can enable logging all your emails
@@ -60,16 +76,20 @@ function fe_stop_emails( $phpmailer ) {
     // stop emails
     $phpmailer = new Fe_Stop_Emails_Fake_PHPMailer();
 
-} // fe_stop_emails()
+}
 
 function fe_stop_emails_warning() {
     echo "\n<div class='error'><p>";
-    _e('<strong>Emails Disabled:</strong> The Stop Emails plugin is currently active, which will prevent any emails from being sent. To enable emails, disable the plugin.', 'stop-emails');
+        echo "<strong>";
+        _e('Emails Disabled:', 'stop-emails');
+        echo "</strong>";
+        _e('The Stop Emails plugin is currently active, which will prevent any emails from being sent. To enable emails, disable the plugin.', 'stop-emails');
     echo "</p></div>";
+}
 
-} // fe_stop_emails_warning()
+function fe_stop_emails_load_plugin_textdomain() {
+    $domain = 'stop-emails';
+    $plugin_rel_path = dirname(plugin_basename(__FILE__)) . '/languages';
 
-// stop emails
-add_action('phpmailer_init', 'fe_stop_emails');
-// display a warning that emails are being stopped
-add_action('admin_notices', 'fe_stop_emails_warning');
+    load_plugin_textdomain( $domain, false, $plugin_rel_path );
+}
