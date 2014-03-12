@@ -3,7 +3,7 @@ Contributors: salcode
 Tags: email, development
 Requires at least: 3.6
 Tested up to: 3.8.1
-Stable tag: 0.5.0
+Stable tag: 0.6.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -15,8 +15,16 @@ Stops outgoing emails sent using wp_mail() function.
 Any calls to wp_mail() will fail silently (i.e. WordPress
 will operate as if the email were sent successfully
 but no email will actually be sent).
+
+On the admin menu page Settings > Stop Emails, there is the option
+to log all emails to the PHP error log.  By default this logging is
+disabled.
+
+
 NOTE: If using the PHP mail() function directly, this
 plugin will NOT stop the emails.
+
+Built by <a href="//twitter.com/salcode">@salcode</a> / <a rel="author" href="https://plus.google.com/100823173217716320069">Sal Ferrarello</a>
 
 == Installation ==
 
@@ -43,11 +51,9 @@ doing to cause emails to still be sent.
 2. The plugin is calling the PHP function mail() directly.
 Unfortunately in either of these cases, this plugin will not help you.
 
-= I'm a developer and I want to log the emails that are stopped =
-You can log stopped emails in
-php_error.log using the filter 'fe_stop_emails_log_email'
-
-add_filter('fe_stop_emails_log_email', '__return_true');
+= I want to log the emails that are stopped =
+You can enable logging of stopped emails on the
+admin menu page Settings > Stop Emails
 
 == Screenshots ==
 
@@ -55,6 +61,10 @@ add_filter('fe_stop_emails_log_email', '__return_true');
 1. Lies! The email wasn't really sent, we're running Stop Emails
 
 == Changelog ==
+
+= 0.6.0 =
+* Add admin settings page with option to enable logging of stopped emails to
+PHP error log
 
 = 0.5.0 =
 * Correct breaking change
@@ -74,6 +84,9 @@ log the blocked emails in the php_error.log
 * First release
 
 == Upgrade Notice ==
+
+= 0.6.0 =
+Add admin Settings > Stop Emails page with option to log stopped emails in PHP error log.
 
 = 0.5.0 =
 Important - fixes breaking change in 0.4.0
