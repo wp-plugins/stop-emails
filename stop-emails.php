@@ -8,7 +8,7 @@
  * but no email will actually be sent).
  * NOTE: If using the PHP mail() function directly, this
  * plugin will NOT stop the emails.
- * Version: 0.5.0
+ * Version: 0.6.0
  * Author: Sal Ferrarello
  * Author URI: http://salferrarello.com/
  * Text Domain: stop-emails
@@ -20,6 +20,13 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
+// run tasks on deactivate
+include('lib/deactivate.php');
+register_deactivation_hook( __FILE__, 'fe_stop_emails_deactivate' );
+
+// create admin settings screen
+include('lib/admin-settings.php');
+
 // stop emails
 add_action('phpmailer_init', 'fe_stop_emails');
 
@@ -30,10 +37,8 @@ add_action('admin_notices', 'fe_stop_emails_warning');
 add_action('init', 'fe_stop_emails_load_plugin_textdomain');
 
 function fe_stop_emails( $phpmailer ) {
-    // as a developer, you can enable logging all your emails
-    // to the PHP error log when they are prevented from sending
-    // in the future, this will be a setting for the plugin
-    $log_email = apply_filters('fe_stop_emails_log_email', false);
+
+    $log_email = fe_stop_emails_will_log_emails();
 
     if ( !class_exists('Fe_Stop_Emails_Fake_PHPMailer') ) {
 
@@ -53,7 +58,8 @@ function fe_stop_emails( $phpmailer ) {
             // an instance of $phpmailer
             public static function LogEmail( $phpmailer ) {
                 $log_entry = "\n";
-                $log_entry .= 'To: ';
+
+                $log_entry .= __( 'To: ', 'stop-emails' );
                 foreach ($phpmailer->to as $toArray) {
                     foreach ($toArray as $to) {
                         if ( is_string($to) && trim($to) ) {
@@ -62,11 +68,16 @@ function fe_stop_emails( $phpmailer ) {
                     }
                 } // foreach
                 $log_entry .= "\n";
-                $log_entry .= 'From: ' . $phpmailer->From . "\n";
-                $log_entry .= 'Subject: ' . $phpmailer->Subject . "\n";
-                $log_entry .= $phpmailer->Body . "\n";
 
-                error_log($log_entry);
+                $log_entry .= __( 'From: ', 'stop-emails' );
+                $log_entry .= $phpmailer->From . "\n";
+
+                $log_entry .= __( 'Subject: ', 'stop-emails' );
+                $log_entry .= $phpmailer->Subject . "\n";
+
+                $log_entry .= $phpmailer->Body . "\n";
+                error_log( $log_entry );
+
             } // LogEmail()
         } // class Fe_Stop_Emails_Fake_PHPMailer
     } // if class Fe_Stop_Emails_Fake_PHPMailer does not already exist
@@ -78,12 +89,41 @@ function fe_stop_emails( $phpmailer ) {
 
 }
 
+function fe_stop_emails_will_log_emails() {
+    // retrieve set options
+    $options = get_option( 'fe_stop_emails_options' );
+
+    // set $log_email based on saved options
+    // default to zero
+    if ( $options && isset( $options['log-email'] ) ) {
+        // use value from options
+        $log_email = $options['log-email'];
+    } else {
+        // default value
+        $log_email = 0;
+    }
+
+    // apply filter to log_email value
+    // as a developer, you can enable logging all your emails
+    // to the PHP error log when they are prevented from sending
+    $log_email = apply_filters( 'fe_stop_emails_log_email', $log_email );
+
+    return $log_email;
+}
+
 function fe_stop_emails_warning() {
     echo "\n<div class='error'><p>";
         echo "<strong>";
-        _e('Emails Disabled:', 'stop-emails');
+        if ( fe_stop_emails_will_log_emails() ) {
+            _e('Logging Disabled Emails', 'stop-emails');
+        } else {
+            _e('Emails Disabled', 'stop-emails');
+        }
+        echo ': ';
         echo "</strong>";
-        _e('The Stop Emails plugin is currently active, which will prevent any emails from being sent. To enable emails, disable the plugin.', 'stop-emails');
+
+        _e( 'The Stop Emails plugin is currently active, which will prevent any emails from being sent.  ', 'stop-emails' );
+        _e( 'To send emails, disable the plugin.', 'stop-emails');
     echo "</p></div>";
 }
 
