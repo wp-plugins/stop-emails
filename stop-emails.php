@@ -8,7 +8,7 @@
  * but no email will actually be sent).
  * NOTE: If using the PHP mail() function directly, this
  * plugin will NOT stop the emails.
- * Version: 0.6.0
+ * Version: 0.6.1
  * Author: Sal Ferrarello
  * Author URI: http://salferrarello.com/
  * Text Domain: stop-emails
@@ -19,6 +19,8 @@
 if ( ! defined( 'WPINC' ) ) {
     die;
 }
+
+$plugin_basename_path = plugin_basename(__FILE__);
 
 // run tasks on deactivate
 include('lib/deactivate.php');
@@ -35,6 +37,9 @@ add_action('admin_notices', 'fe_stop_emails_warning');
 
 // Load plugin text domain
 add_action('init', 'fe_stop_emails_load_plugin_textdomain');
+
+// Add Settings link on Plugin Page
+add_filter("plugin_action_links_$plugin_basename_path", 'fe_stop_emails_settings_link_on_plugin_page' );
 
 function fe_stop_emails( $phpmailer ) {
 
@@ -132,4 +137,11 @@ function fe_stop_emails_load_plugin_textdomain() {
     $plugin_rel_path = dirname(plugin_basename(__FILE__)) . '/languages';
 
     load_plugin_textdomain( $domain, false, $plugin_rel_path );
+}
+
+function fe_stop_emails_settings_link_on_plugin_page( $links ) {
+    $links[] = '<a href="' .
+        admin_url( 'options-general.php?page=fe_stop_emails' ) .
+        '">' . __('Settings') . '</a>';
+    return $links;
 }
