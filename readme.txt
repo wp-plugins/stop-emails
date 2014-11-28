@@ -2,8 +2,8 @@
 Contributors: salcode
 Tags: email, development
 Requires at least: 3.6
-Tested up to: 4.0
-Stable tag: 0.6.2
+Tested up to: 4.0.1
+Stable tag: 0.7.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,7 +24,8 @@ disabled.
 NOTE: If using the PHP mail() function directly, this
 plugin will NOT stop the emails.
 
-Built by <a href="//twitter.com/salcode">@salcode</a> / <a rel="author" href="https://plus.google.com/100823173217716320069">Sal Ferrarello</a>
+Built by <a href="//twitter.com/salcode">@salcode</a> / <a rel="author" href="https://plus.google.com/100823173217716320069">Sal Ferrarello</a>,
+[salferrarello.com](http://salferrarello.com/)
 
 == Installation ==
 
@@ -35,7 +36,7 @@ Built by <a href="//twitter.com/salcode">@salcode</a> / <a rel="author" href="ht
 
 1. Upload the entire `stop-emails` directory to the `/wp-content/plugins/` directory.
 2. Activate Stop Emails through the 'Plugins' menu in WordPress.
-http://localhost/bootstrap-genesis/wp-admin/credits.php
+
 == Frequently Asked Questions ==
 
 = Where do the emails go? =
@@ -61,6 +62,9 @@ admin menu page Settings > Stop Emails
 1. Lies! The email wasn't really sent, we're running Stop Emails
 
 == Changelog ==
+
+= 0.7.0 =
+* Added filter fe_stop_emails_log to allow other logging of blocked emails
 
 = 0.6.2 =
 * "Tested Up To:" version bump to 4.0
@@ -92,6 +96,9 @@ log the blocked emails in the php_error.log
 * First release
 
 == Upgrade Notice ==
+
+= 0.7.0 =
+Minor update that adds support for extended logging.  See [Stop Emails Logger](https://github.com/salcode/stop-emails-logger).
 
 = 0.6.2 =
 Minor update. "Tested to" version bump to 4.0 and added plugin icons
