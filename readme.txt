@@ -2,8 +2,8 @@
 Contributors: salcode
 Tags: email, development
 Requires at least: 3.6
-Tested up to: 4.0.1
-Stable tag: 0.7.0
+Tested up to: 4.1
+Stable tag: 0.8.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -37,6 +37,11 @@ Built by <a href="//twitter.com/salcode">@salcode</a> / <a rel="author" href="ht
 1. Upload the entire `stop-emails` directory to the `/wp-content/plugins/` directory.
 2. Activate Stop Emails through the 'Plugins' menu in WordPress.
 
+= mu-plugin Installation
+
+1.  If the directory `wp-content/mu-plugins/` does not exist, create it.
+2.  Upload the single file `stop-emails.php` to the  `wp-content/mu-plugins/` directory
+
 == Frequently Asked Questions ==
 
 = Where do the emails go? =
@@ -53,8 +58,15 @@ doing to cause emails to still be sent.
 Unfortunately in either of these cases, this plugin will not help you.
 
 = I want to log the emails that are stopped =
+
 You can enable logging of stopped emails on the
 admin menu page Settings > Stop Emails
+
+= Why would I want install in the mu-plugins directory? =
+Activating a plugin normally requires logging into the site.
+Installing the file in the mu-plugins directory allows you to
+activate the plugin without logging in.  This can be
+helpful when setting up an existing site locally.
 
 == Screenshots ==
 
@@ -62,6 +74,16 @@ admin menu page Settings > Stop Emails
 1. Lies! The email wasn't really sent, we're running Stop Emails
 
 == Changelog ==
+
+= 0.8.0 =
+* Overhaul of plugin includes: fixing issue with plugin not stopping emails, moving to a class structure, changing email stopping
+behavior to use the same technique as WordPress core tests, improved inline documentation,
+addtion of phpunit tests. Introduces a breaking change with https://github.com/salcode/stop-emails-logger
+
+= 0.7.1 =
+* Added check for supporting files before loading them.  Since the primary functionality
+is in stop-emails.php, adding this check allows stop-emails.php to be used in the
+mu-plugins/ directory (previously, it would throw warnings)
 
 = 0.7.0 =
 * Added filter fe_stop_emails_log to allow other logging of blocked emails
@@ -96,6 +118,9 @@ log the blocked emails in the php_error.log
 * First release
 
 == Upgrade Notice ==
+
+= 0.8.0 =
+Important - fixes issues with plugin not Stopping Emails.
 
 = 0.7.0 =
 Minor update that adds support for extended logging.  See [Stop Emails Logger](https://github.com/salcode/stop-emails-logger).
