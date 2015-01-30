@@ -8,7 +8,7 @@
  * but no email will actually be sent).
  * NOTE: If using the PHP mail() function directly, this
  * plugin will NOT stop the emails.
- * Version: 0.7.0
+ * Version: 0.8.0
  * Author: Sal Ferrarello
  * Author URI: http://salferrarello.com/
  * Text Domain: stop-emails
@@ -17,133 +17,263 @@
 
 // If this file is called directly, abort.
 if ( ! defined( 'WPINC' ) ) {
-    die;
+	die;
 }
 
-$plugin_basename_path = plugin_basename(__FILE__);
+register_deactivation_hook( __FILE__, array( 'Fe_Stop_Emails', 'on_deactivation' ) );
 
-// run tasks on deactivate
-include('lib/deactivate.php');
-register_deactivation_hook( __FILE__, 'fe_stop_emails_deactivate' );
+// load PHPMailer class, so we can subclass it
+require_once ABSPATH . WPINC . '/class-phpmailer.php';
 
-// create admin settings screen
-include('lib/admin-settings.php');
+/**
+ * Subclass of PHPMailer to prevent Sending.
+ *
+ * This subclass of PHPMailer replaces the send() method
+ * with a method that does not send.
+ * This subclass is based on the WP Core MockPHPMailer
+ * found in phpunit/includes/mock-mailer.php
+ *
+ * @since 0.8.0
+ * @see PHPMailer
+ */
+class Fe_Stop_Emails_Fake_PHPMailer extends PHPMailer {
+	var $mock_sent = array();
 
-// stop emails
-add_action('phpmailer_init', 'fe_stop_emails');
+	/**
+	 * Replacement send() method that does not send.
+	 *
+	 * Unlike the PHPMailer send method,
+	 * this method never calls the method postSend(),
+	 * which is where the email is actually sent
+	 *
+	 * @since 0.8.0
+	 * @return bool
+	 */
+	function send() {
+		try {
+			if ( ! $this->preSend() ) {
+				return false;
+			}
 
-// display a warning that emails are being stopped
-add_action('admin_notices', 'fe_stop_emails_warning');
+			$mock_email = array(
+				'to'     => $this->to,
+				'cc'     => $this->cc,
+				'bcc'    => $this->bcc,
+				'header' => $this->MIMEHeader,
+				'body'   => $this->MIMEBody,
+			);
 
-// Load plugin text domain
-add_action('init', 'fe_stop_emails_load_plugin_textdomain');
+			$this->mock_sent[] = $mock_email;
 
-// Add Settings link on Plugin Page
-add_filter("plugin_action_links_$plugin_basename_path", 'fe_stop_emails_settings_link_on_plugin_page' );
+			// hook to allow logging
+			do_action( 'fe_stop_emails_log', $mock_email );
 
-function fe_stop_emails( $phpmailer ) {
-
-    $log_email = fe_stop_emails_will_log_emails();
-
-    if ( !class_exists('Fe_Stop_Emails_Fake_PHPMailer') ) {
-
-        // create class to extend PHPMailer to prevent sending
-        // why not move this class definition outside of the surrounding function?
-        // PHPMailer is not defined when the raw code in this file is processed,
-        // therefore, we need to wait until late enough in the loading
-        // that the class is loaded
-        class Fe_Stop_Emails_Fake_PHPMailer extends PHPMailer {
-            // remove all functionality from Send method (other than
-            // return a true value)
-            function Send() {
-                return true;
-            } // Send()
-
-            // static function for logging the email in
-            // an instance of $phpmailer
-            public static function LogEmail( $phpmailer ) {
-                $log_entry = "\n";
-
-                $log_entry .= __( 'To: ', 'stop-emails' );
-                foreach ($phpmailer->to as $toArray) {
-                    foreach ($toArray as $to) {
-                        if ( is_string($to) && trim($to) ) {
-                            $log_entry .= $to . ', ';
-                        }
-                    }
-                } // foreach
-                $log_entry .= "\n";
-
-                $log_entry .= __( 'From: ', 'stop-emails' );
-                $log_entry .= $phpmailer->From . "\n";
-
-                $log_entry .= __( 'Subject: ', 'stop-emails' );
-                $log_entry .= $phpmailer->Subject . "\n";
-
-                $log_entry .= $phpmailer->Body . "\n";
-                error_log( $log_entry );
-
-            } // LogEmail()
-        } // class Fe_Stop_Emails_Fake_PHPMailer
-    } // if class Fe_Stop_Emails_Fake_PHPMailer does not already exist
-
-    if ( $log_email ) { Fe_Stop_Emails_Fake_PHPMailer::LogEmail( $phpmailer ); }
-
-    apply_filters( 'fe_stop_emails_log', $phpmailer );
-
-    // stop emails
-    $phpmailer = new Fe_Stop_Emails_Fake_PHPMailer();
-
+			return true;
+		} catch ( phpmailerException $e ) {
+			return false;
+		}
+	}
 }
 
-function fe_stop_emails_will_log_emails() {
-    // retrieve set options
-    $options = get_option( 'fe_stop_emails_options' );
+/**
+ * Stop Emails Plugin Class.
+ *
+ * Prevents emails from being sent and provides basic logging.
+ * Replaces PHPMailer global instance $phpmailer with an instance
+ * of the subclass Fe_Stop_Emails_Fake_PHPMailer
+ *
+ * @since 0.8.0
+ */
+class Fe_Stop_Emails {
+	/**
+	 * Constuctor to setup plugin.
+	 *
+	 * @since 0.8.0
+	 */
+	public function __construct() {
+		$this->add_hooks();
 
-    // set $log_email based on saved options
-    // default to zero
-    if ( $options && isset( $options['log-email'] ) ) {
-        // use value from options
-        $log_email = $options['log-email'];
-    } else {
-        // default value
-        $log_email = 0;
-    }
+		$this->settings_page();
+	}
 
-    // apply filter to log_email value
-    // as a developer, you can enable logging all your emails
-    // to the PHP error log when they are prevented from sending
-    $log_email = apply_filters( 'fe_stop_emails_log_email', $log_email );
+	/**
+	 * Add hooks.
+	 *
+	 * @since 0.8.0
+	 */
+	public function add_hooks() {
+		add_action( 'plugins_loaded', array( $this, 'replace_phpmailer' ) );
+		add_action( 'fe_stop_emails_log', array( $this, 'log_to_php_error_log' ) );
+		add_action( 'admin_notices', array( $this, 'warning' ) );
+		add_action( 'init', array( $this, 'load_textdomain' ) );
+	}
 
-    return $log_email;
+	/**
+	 * Replace the global $phpmailer with fake phpmailer.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @return Fe_Stop_Emails_Fake_PHPMailer instance, the object that replaced
+	 *                                                 the global $phpmailer
+	 */
+	public function replace_phpmailer() {
+		global $phpmailer;
+		return $this->replace_w_fake_phpmailer( $phpmailer );
+	}
+
+	/**
+	 * Replace the parameter object with an instance of
+	 * Fe_Stop_Emails_Fake_PHPMailer.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @param PHPMailer $obj
+	 * @return Fe_Stop_Emails_Fake_PHPMailer $obj
+	 */
+	public function replace_w_fake_phpmailer( &$obj = null ) {
+		$obj = new Fe_Stop_Emails_Fake_PHPMailer;
+
+		return $obj;
+	}
+
+	/**
+	 * Should emails be logged to the PHP error log.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @return bool
+	 */
+	public function should_emails_be_logged_to_php_error_log() {
+		$options = get_option( 'fe_stop_emails_options' );
+
+		if ( $options && isset( $options['log-email'] ) ) {
+			// use value from options
+			$log_to_error_log = $options['log-email'];
+		} else {
+			// default value
+			$log_to_error_log = 0;
+		}
+
+		$log_to_error_log = apply_filters( 'fe_stop_emails_log_email', $log_to_error_log );
+
+		return (bool) $log_to_error_log;
+	}
+
+	/**
+	 * Hooked function for email logging.
+	 *
+	 * Checks if email should be logged and logs it if necessary
+	 *
+	 * @since 0.8.0
+	 */
+	public function log_to_php_error_log( $mock_email ) {
+		if ( $this->should_emails_be_logged_to_php_error_log() ) {
+			$text = $this->mock_email_to_text( $mock_email );
+			error_log( $text );
+		}
+	}
+
+	/**
+	 * Convert mock email to text.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @param Fe_Stop_Emails_Fake_PHPMailer $fake_phpmailer
+	 * @return string, text version of email
+	 */
+	public function mock_email_to_text( $mock_email ) {
+		return print_r( $mock_email, true );
+	}
+
+	/**
+	 * Display Warning that emails are being stopped.
+	 *
+	 * Display admin notice warning that emails are being
+	 * stopped, additionally if emails are being logged
+	 * in the PHP error_log, it is noted that emails are
+	 * being logged.
+	 *
+	 * @since 0.8.0
+	 */
+	public function warning() {
+		echo "\n<div class='error'><p>";
+		echo "<strong>";
+		if ( $this->should_emails_be_logged_to_php_error_log() ) {
+			_e('Logging Disabled Emails', 'stop-emails');
+		} else {
+			_e('Emails Disabled', 'stop-emails');
+		}
+		echo ': ';
+		echo "</strong>";
+
+		_e( 'The Stop Emails plugin is currently active, which will prevent any emails from being sent.  ', 'stop-emails' );
+		_e( 'To send emails, disable the plugin.', 'stop-emails');
+		echo "</p></div>";
+	}
+
+	/**
+	 * Create Settings Page.
+	 *
+	 * The settings page is created in lib/admin-settings.php.
+	 * We include a check that this file exists, so we can
+	 * run this plugin with only this primary file; this
+	 * allows using this single file as an "mu-plugins" plugin.
+	 *
+	 * @since 0.8.0
+	 */
+	public function settings_page() {
+		$plugin_dir_path = plugin_dir_path(__FILE__);
+		$plugin_basename = plugin_basename(__FILE__);
+
+		if ( file_exists( "{$plugin_dir_path}lib/admin-settings.php" ) ) {
+			// create admin settings screen
+			require_once( "{$plugin_dir_path}lib/admin-settings.php" );
+
+			// Add Settings link on Plugin Page
+			add_filter( "plugin_action_links_$plugin_basename", array( $this, 'settings_link_on_plugin_page' ) );
+		}
+	}
+
+	/**
+	 * Add a settings link to links for this plugin on the plugin page.
+	 *
+	 * Add to the $links array, an element that contains the html markup
+	 * for the settings page for this link.
+	 *
+	 * @since 0.8.0
+	 * @param array of strings, each of which is the markup for a link
+	 * @return array of strings, each of which is the markup for a link
+	 *                           with additional link
+	 */
+	public function settings_link_on_plugin_page( $links ) {
+		$links[] = '<a href="' .
+			admin_url( 'options-general.php?page=fe_stop_emails' ) .
+			'">' . __( 'Settings' ) . '</a>';
+		return $links;
+	}
+
+	/**
+	 * Load textdomain for translations.
+	 *
+	 * @since 0.8.0
+	 */
+	public function load_textdomain() {
+		$domain = 'stop-emails';
+		$plugin_rel_path = dirname( plugin_basename(__FILE__) ) . '/languages';
+
+		load_plugin_textdomain( $domain, false, $plugin_rel_path );
+	}
+
+	/**
+	 * On plugin deactivation clean up.
+	 *
+	 * Remove the plugin option, where settings are stored
+	 *
+	 * @since 0.8.0
+	 */
+	public static function on_deactivation() {
+		delete_option( 'fe_stop_emails_options' );
+	}
 }
 
-function fe_stop_emails_warning() {
-    echo "\n<div class='error'><p>";
-        echo "<strong>";
-        if ( fe_stop_emails_will_log_emails() ) {
-            _e('Logging Disabled Emails', 'stop-emails');
-        } else {
-            _e('Emails Disabled', 'stop-emails');
-        }
-        echo ': ';
-        echo "</strong>";
-
-        _e( 'The Stop Emails plugin is currently active, which will prevent any emails from being sent.  ', 'stop-emails' );
-        _e( 'To send emails, disable the plugin.', 'stop-emails');
-    echo "</p></div>";
-}
-
-function fe_stop_emails_load_plugin_textdomain() {
-    $domain = 'stop-emails';
-    $plugin_rel_path = dirname(plugin_basename(__FILE__)) . '/languages';
-
-    load_plugin_textdomain( $domain, false, $plugin_rel_path );
-}
-
-function fe_stop_emails_settings_link_on_plugin_page( $links ) {
-    $links[] = '<a href="' .
-        admin_url( 'options-general.php?page=fe_stop_emails' ) .
-        '">' . __('Settings') . '</a>';
-    return $links;
-}
+new Fe_Stop_Emails;
